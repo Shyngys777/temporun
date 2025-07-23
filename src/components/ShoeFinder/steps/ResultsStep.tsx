@@ -1,10 +1,10 @@
-
 import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 import { ShoeFilterState } from '../ShoeFinder';
 import ProductCard from '@/components/ProductCard';
-import { products } from '@/lib/data';
+import { useProducts } from '@/hooks/useProducts';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ResultsStepProps {
     filters: ShoeFilterState;
@@ -12,6 +12,20 @@ interface ResultsStepProps {
 }
 
 export const ResultsStep: React.FC<ResultsStepProps> = ({ filters, onReset }) => {
+    const { data: productsData, isLoading } = useProducts();
+    const products = productsData?.data || [];
+    
+    const ProductSkeleton = () => (
+        <div className="space-y-4">
+            <Skeleton className="aspect-square w-full rounded-lg" />
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-1/4" />
+            </div>
+        </div>
+    );
+
     const filteredProducts = useMemo(() => {
         let result = [...products];
 
@@ -27,14 +41,14 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({ filters, onReset }) =>
             // Tags that indicate daily/training shoes
             result = result.filter(product =>
                 product.tags?.some(tag =>
-                    ['daily-trainer', 'cushioned', 'comfort', 'neutral', 'stability'].includes(tag)
+                    ['daily-trainer', 'cushioned', 'comfort', 'neutral', 'stability'].includes(tag.tag)
                 )
             );
         } else if (filters.purpose === 'racing') {
             // Tags that indicate racing/speed shoes
             result = result.filter(product =>
                 product.tags?.some(tag =>
-                    ['racing', 'speed', 'responsive', 'tempo', 'lightweight'].includes(tag)
+                    ['racing', 'speed', 'responsive', 'tempo', 'lightweight'].includes(tag.tag)
                 )
             );
         }
@@ -43,15 +57,15 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({ filters, onReset }) =>
         if (filters.stability) {
             if (filters.stability === 'none') {
                 result = result.filter(product =>
-                    product.tags?.includes('neutral')
+                    product.tags?.some(tag => tag.tag === 'neutral')
                 );
             } else if (filters.stability === 'light') {
                 result = result.filter(product =>
-                    product.tags?.some(tag => ['neutral', 'support'].includes(tag))
+                    product.tags?.some(tag => ['neutral', 'support'].includes(tag.tag))
                 );
             } else if (filters.stability === 'moderate' || filters.stability === 'max') {
                 result = result.filter(product =>
-                    product.tags?.some(tag => ['stability', 'support', 'overpronation'].includes(tag))
+                    product.tags?.some(tag => ['stability', 'support', 'overpronation'].includes(tag.tag))
                 );
             }
         }
@@ -60,22 +74,22 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({ filters, onReset }) =>
         if (filters.cushioning) {
             if (filters.cushioning === 'low') {
                 result = result.filter(product =>
-                    product.tags?.some(tag => ['lightweight', 'responsive'].includes(tag))
+                    product.tags?.some(tag => ['lightweight', 'responsive'].includes(tag.tag))
                 );
             } else if (filters.cushioning === 'moderate') {
                 result = result.filter(product =>
-                    product.tags?.some(tag => ['balanced', 'versatile'].includes(tag))
+                    product.tags?.some(tag => ['balanced', 'versatile'].includes(tag.tag))
                 );
             } else if (filters.cushioning === 'high') {
                 result = result.filter(product =>
-                    product.tags?.includes('cushioned')
+                    product.tags?.some(tag => tag.tag === 'cushioned')
                 );
             }
         }
 
         // Return at most 12 products to ensure performance
         return result.slice(0, 12);
-    }, [filters]);
+    }, [filters, products]);
 
     return (
         <div className="p-8">
@@ -117,20 +131,26 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({ filters, onReset }) =>
             {filteredProducts.length > 0 ? (
                 <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                        {filteredProducts.map(product => (
-                            <ProductCard
-                                key={product.id}
-                                id={product.id}
-                                name={product.name}
-                                brand={product.brand}
-                                price={product.price}
-                                originalPrice={product.originalPrice}
-                                colorway={product.colorway}
-                                image={product.image}
-                                isNew={product.isNew}
-                                isSale={product.isSale}
-                            />
-                        ))}
+                        {isLoading ? (
+                            Array.from({ length: 6 }).map((_, index) => (
+                                <ProductSkeleton key={`skeleton-${index}`} />
+                            ))
+                        ) : (
+                            filteredProducts.map(product => (
+                                <ProductCard
+                                    key={product.id}
+                                    id={product.id}
+                                    name={product.name}
+                                    brand={product.brand.name}
+                                    price={product.min_price}
+                                    originalPrice={product.compare_at_price || undefined}
+                                    colorway={product.variants?.[0]?.colorway || 'Multiple Colors'}
+                                    image={product.primary_image || ''}
+                                    isNew={product.is_new}
+                                    isSale={!!product.compare_at_price}
+                                />
+                            ))
+                        )}
                     </div>
 
                     <div className="flex justify-between">

@@ -4,50 +4,22 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProductCard from './ProductCard';
+import { useFeaturedProducts } from '@/hooks/useProducts';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Sample product data
-const featuredProducts = [
-  {
-    id: '1',
-    name: 'Adidas adizero adios pro 4',
-    brand: 'Adidas',
-    price: 220,
-    colorway: 'Core Black / Cloud White',
-    image: 'https://cdn.sportsshoes.com/product/A/ADI17814/ADI17814_400_1.jpg',
-    isNew: true,
-  },
-  {
-    id: '2',
-    name: 'Adistar Byd',
-    brand: 'Adidas',
-    price: 129.99,
-    colorway: 'Blue Void / Bright Crimson',
-    image: 'https://cdn.sportsshoes.com/product/A/ADI17653/ADI17653_400_1.jpg',
-    isNew: true,
-  },
-  {
-    id: '3',
-    name: 'Novablast 5',
-    brand: 'Asics',
-    price: 149.99,
-    originalPrice: 159.99,
-    colorway: 'Grey / White',
-    image: 'https://cdn11.bigcommerce.com/s-21x65e8kfn/images/stencil/original/products/74276/381482/ASI15343_1000_3__71373.1733419188.jpg',
-    isSale: false,
-    isNew: true,
-  },
-  {
-    id: '4',
-    name: 'Rincon 4',
-    brand: 'Hoka',
-    price: 159.99,
-    colorway: 'Black / Graphite Grey',
-    image: 'https://cdn.sportsshoes.com/product/H/HOK2763/HOK2763_400_1.jpg',
-    isNew: true,
-  },
-];
+const ProductSkeleton = () => (
+  <div className="space-y-4">
+    <Skeleton className="aspect-square w-full rounded-lg" />
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-4 w-1/4" />
+    </div>
+  </div>
+);
 
 const FeaturedProductsSection = () => {
+  const { data: featuredProducts, isLoading, error } = useFeaturedProducts(4);
   const sectionRef = useRef<HTMLDivElement>(null);
   const productRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -99,16 +71,44 @@ const FeaturedProductsSection = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
-            {featuredProducts.map((product, index) => (
+            {isLoading ? (
+              // Show loading skeletons
+              Array.from({ length: 4 }).map((_, index) => (
+                <div
+                    key={`skeleton-${index}`}
+                    ref={(el) => (productRefs.current[index] = el)}
+                    className="motion-safe-animate"
+                    style={{ animationDelay: `${index * 150}ms` }}
+                >
+                  <ProductSkeleton />
+                </div>
+              ))
+            ) : error ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">Unable to load featured products</p>
+              </div>
+            ) : (
+              featuredProducts?.map((product, index) => (
                 <div
                     key={product.id}
                     ref={(el) => (productRefs.current[index] = el)}
                     className="motion-safe-animate"
                     style={{ animationDelay: `${index * 150}ms` }}
                 >
-                  <ProductCard {...product} />
+                  <ProductCard
+                    id={product.id}
+                    name={product.name}
+                    brand={product.brand.name}
+                    price={product.min_price}
+                    originalPrice={product.compare_at_price || undefined}
+                    colorway={product.variants?.[0]?.colorway || 'Multiple Colors'}
+                    image={product.primary_image || ''}
+                    isNew={product.is_new}
+                    isSale={!!product.compare_at_price}
+                  />
                 </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>

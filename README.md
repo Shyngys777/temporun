@@ -1,5 +1,50 @@
 # Welcome to your Lovable project
 
+## TempoRun - Full-Stack E-commerce Platform
+
+A modern running shoe e-commerce platform built with React, TypeScript, Tailwind CSS, and Supabase.
+
+### Features
+
+- **Dynamic Product Catalog**: Full product management with Supabase backend
+- **Brand & Category Management**: Hierarchical organization of products
+- **Inventory Tracking**: Real-time stock management
+- **Search & Filtering**: Advanced product discovery
+- **Responsive Design**: Mobile-first approach with Tailwind CSS
+- **Performance Optimized**: React Query for efficient data fetching
+- **SEO Friendly**: Meta tags and structured data
+
+### Database Schema
+
+The application uses a comprehensive e-commerce schema with:
+- Products with variants (sizes, colors)
+- Brand and category hierarchies
+- Inventory management
+- Collections and tagging system
+- Image management
+
+### Getting Started
+
+1. **Set up Supabase**: Click "Connect to Supabase" in the top right
+2. **Run migrations**: The database schema will be automatically applied
+3. **Seed data**: Sample products and brands will be populated
+4. **Start developing**: The app will automatically connect to your Supabase instance
+
+### API Structure
+
+- `src/lib/api/products.ts` - Product management and queries
+- `src/lib/api/brands.ts` - Brand operations
+- `src/lib/api/categories.ts` - Category management
+- `src/lib/api/collections.ts` - Collection handling
+- `src/lib/api/admin.ts` - Admin operations (protected)
+
+### Hooks
+
+- `useProducts()` - Fetch products with filtering and pagination
+- `useBrands()` - Brand data management
+- `useCategories()` - Category operations
+- React Query for caching and performance
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/bcd17cc2-c9aa-4316-8d88-0a132b77ccd2

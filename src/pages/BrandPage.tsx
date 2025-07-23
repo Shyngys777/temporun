@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProductsByBrand, getBrands, products } from '@/lib/data';
+import { useBrand } from '@/hooks/useBrands';
+import { useProductsByBrand } from '@/hooks/useProducts';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
 import Newsletter from '@/components/Newsletter';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -14,6 +16,17 @@ import BrandHero from '@/components/BrandHero';
 import BrandCollections, { CollectionItem } from '@/components/BrandCollections';
 import BrandCategories, { CategoryItem } from '@/components/BrandCategories';
 import { Separator } from '@/components/ui/separator';
+
+const ProductSkeleton = () => (
+  <div className="space-y-4">
+    <Skeleton className="aspect-square w-full rounded-lg" />
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-4 w-1/4" />
+    </div>
+  </div>
+);
 
 export interface BrandHeroSlide {
   image: string;
@@ -544,31 +557,27 @@ const defaultBrandContent: BrandContent = {
 
 const BrandPage = () => {
   const { brandName } = useParams<{ brandName: string }>();
-  const formattedBrandName = brandName?.replace(/-/g, ' ');
-  const products = getProductsByBrand(formattedBrandName || '');
-  const allBrands = getBrands();
+  const brandSlug = brandName || '';
+  
+  const { data: brand, isLoading: brandLoading, error: brandError } = useBrand(brandSlug);
+  const { data: products, isLoading: productsLoading, error: productsError } = useProductsByBrand(brandSlug);
+  
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [visibleProducts, setVisibleProducts] = useState(products);
+  const [visibleProducts, setVisibleProducts] = useState(products || []);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
-  const isBrandValid = allBrands.some(
-      brand => brand.toLowerCase() === formattedBrandName?.toLowerCase()
-  );
-
-  const displayBrandName = formattedBrandName
-      ?.split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-
+  const displayBrandName = brand?.name || '';
   const content = (displayBrandName && brandContent[displayBrandName as keyof typeof brandContent]) || defaultBrandContent;
 
   useEffect(() => {
+    if (!products) return;
+    
     if (activeCategory === 'all') {
       setVisibleProducts(products);
     } else {
       setVisibleProducts(
-          products.filter(product =>
-              product.tags?.some(tag => tag.toLowerCase().includes(activeCategory.toLowerCase()))
+          products.filter(product => 
+              product.tags?.some(tag => tag.tag.toLowerCase().includes(activeCategory.toLowerCase()))
           )
       );
     }
@@ -589,9 +598,28 @@ const BrandPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [brandName]);
+  }, [brandSlug]);
 
-  if (!isBrandValid) {
+  // Loading state
+  if (brandLoading) {
+    return (
+        <div className="min-h-screen flex flex-col">
+          <Navbar />
+          <main className="flex-1 py-16 mt-16">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center my-20">
+                <Skeleton className="h-12 w-64 mx-auto mb-6" />
+                <Skeleton className="h-6 w-96 mx-auto" />
+              </div>
+            </div>
+          </main>
+          <Footer />
+        </div>
+    );
+  }
+
+  // Error state or brand not found
+  if (brandError || !brand) {
     return (
         <div className="min-h-screen flex flex-col">
           <Navbar />
@@ -618,7 +646,7 @@ const BrandPage = () => {
         <Navbar />
 
         <BrandHero
-            brand={displayBrandName || ''}
+            brand={displayBrandName}
             description={content.description}
             slides={content.heroSlides}
             accentColor={content.accentColor}
@@ -633,7 +661,7 @@ const BrandPage = () => {
         </section>
 
         <BrandCollections
-            brandName={displayBrandName || ''}
+            brandName={displayBrandName}
             collections={content.collections}
             accentColor={content.accentColor}
         />
@@ -665,24 +693,17 @@ const BrandPage = () => {
 
               <TabsContent value="all" className="mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
-                  {visibleProducts.map((product) => (
-                      <ProductCard
-                          key={product.id}
-                          id={product.id}
-                          name={product.name}
-                          brand={product.brand}
-                          price={product.price}
-                          originalPrice={product.originalPrice}
-                          colorway={product.colorway}
-                          image={product.image}
-                          isNew={product.isNew}
-                          isSale={product.isSale}
-                      />
-                  ))}
-                </div>
-
-                {visibleProducts.length === 0 && (
-                    <div className="text-center py-16">
+                  {productsLoading ? (
+                    Array.from({ length: 8 }).map((_, index) => (
+                      <ProductSkeleton key={`skeleton-${index}`} />
+                    ))
+                  ) : productsError ? (
+                    <div className="col-span-full text-center py-12">
+                      <p className="text-gray-500 mb-4">Unable to load products</p>
+                      <Button onClick={() => window.location.reload()}>Try Again</Button>
+                    </div>
+                  ) : visibleProducts.length === 0 ? (
+                    <div className="col-span-full text-center py-16">
                       <p className="text-lg text-black/70 mb-6">
                         No products found in this category.
                       </p>
@@ -690,30 +711,35 @@ const BrandPage = () => {
                         <Link to="/brands">Explore Other Brands</Link>
                       </Button>
                     </div>
-                )}
+                  ) : (
+                    visibleProducts.map((product) => (
+                        <ProductCard
+                            key={product.id}
+                            id={product.id}
+                            name={product.name}
+                            brand={product.brand.name}
+                            price={product.min_price}
+                            originalPrice={product.compare_at_price || undefined}
+                            colorway={product.variants?.[0]?.colorway || 'Multiple Colors'}
+                            image={product.primary_image || ''}
+                            isNew={product.is_new}
+                            isSale={!!product.compare_at_price}
+                        />
+                    ))
+                  )}
+                </div>
+
               </TabsContent>
 
               {content.categories.map(category => (
                   <TabsContent key={category.name} value={category.name.toLowerCase()} className="mt-0">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
-                      {visibleProducts.map((product) => (
-                          <ProductCard
-                              key={product.id}
-                              id={product.id}
-                              name={product.name}
-                              brand={product.brand}
-                              price={product.price}
-                              originalPrice={product.originalPrice}
-                              colorway={product.colorway}
-                              image={product.image}
-                              isNew={product.isNew}
-                              isSale={product.isSale}
-                          />
-                      ))}
-                    </div>
-
-                    {visibleProducts.length === 0 && (
-                        <div className="text-center py-16">
+                      {productsLoading ? (
+                        Array.from({ length: 8 }).map((_, index) => (
+                          <ProductSkeleton key={`skeleton-${index}`} />
+                        ))
+                      ) : visibleProducts.length === 0 ? (
+                        <div className="col-span-full text-center py-16">
                           <p className="text-lg text-black/70 mb-6">
                             No products found in this category.
                           </p>
@@ -721,7 +747,24 @@ const BrandPage = () => {
                             <Link to="/brands">Explore Other Brands</Link>
                           </Button>
                         </div>
-                    )}
+                      ) : (
+                        visibleProducts.map((product) => (
+                            <ProductCard
+                                key={product.id}
+                                id={product.id}
+                                name={product.name}
+                                brand={product.brand.name}
+                                price={product.min_price}
+                                originalPrice={product.compare_at_price || undefined}
+                                colorway={product.variants?.[0]?.colorway || 'Multiple Colors'}
+                                image={product.primary_image || ''}
+                                isNew={product.is_new}
+                                isSale={!!product.compare_at_price}
+                            />
+                        ))
+                      )}
+                    </div>
+
                   </TabsContent>
               ))}
             </Tabs>

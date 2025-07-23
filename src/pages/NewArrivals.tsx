@@ -3,12 +3,24 @@ import React from 'react';
 import { Navbar } from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
-import { getNewArrivals } from '@/lib/data';
+import { useNewArrivals } from '@/hooks/useProducts';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { FilterIcon, SlidersHorizontal } from 'lucide-react';
 
+const ProductSkeleton = () => (
+  <div className="space-y-4">
+    <Skeleton className="aspect-square w-full rounded-lg" />
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-4 w-1/4" />
+    </div>
+  </div>
+);
+
 const NewArrivals = () => {
-  const newProducts = getNewArrivals();
+  const { data: newProducts, isLoading, error } = useNewArrivals(20);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -26,7 +38,7 @@ const NewArrivals = () => {
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center">
               <span className="text-sm text-black/70">
-                {newProducts.length} products
+                {isLoading ? 'Loading...' : `${newProducts?.length || 0} products`}
               </span>
             </div>
             
@@ -43,20 +55,35 @@ const NewArrivals = () => {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
-            {newProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                name={product.name}
-                brand={product.brand}
-                price={product.price}
-                originalPrice={product.originalPrice}
-                colorway={product.colorway}
-                image={product.image}
-                isNew={product.isNew}
-                isSale={product.isSale}
-              />
-            ))}
+            {isLoading ? (
+              Array.from({ length: 12 }).map((_, index) => (
+                <ProductSkeleton key={`skeleton-${index}`} />
+              ))
+            ) : error ? (
+              <div className="col-span-full text-center py-12">
+                <p className="text-gray-500 mb-4">Unable to load new arrivals</p>
+                <Button onClick={() => window.location.reload()}>Try Again</Button>
+              </div>
+            ) : newProducts?.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <p className="text-gray-500">No new arrivals available</p>
+              </div>
+            ) : (
+              newProducts?.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  name={product.name}
+                  brand={product.brand.name}
+                  price={product.min_price}
+                  originalPrice={product.compare_at_price || undefined}
+                  colorway={product.variants?.[0]?.colorway || 'Multiple Colors'}
+                  image={product.primary_image || ''}
+                  isNew={product.is_new}
+                  isSale={!!product.compare_at_price}
+                />
+              ))
+            )}
           </div>
         </div>
       </main>

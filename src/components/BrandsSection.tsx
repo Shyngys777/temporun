@@ -4,46 +4,19 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useFeaturedBrands } from '@/hooks/useBrands';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const brands = [
-  {
-    id: 'nike',
-    name: 'Nike',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg',
-    href: '/brands/nike',
-    description: 'Innovative performance technology',
-  },
-  {
-    id: 'adidas',
-    name: 'Adidas',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/2/20/Adidas_Logo.svg',
-    href: '/brands/adidas',
-    description: 'Built for endurance and speed',
-  },
-  {
-    id: 'newbalance',
-    name: 'New Balance',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/New_Balance_logo.svg/2560px-New_Balance_logo.svg.png',
-    href: '/brands/new-balance',
-    description: 'Exceptional comfort and support',
-  },
-  {
-    id: 'asics',
-    name: 'Asics',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Asics_Logo.svg',
-    href: '/brands/asics',
-    description: 'Science-driven running innovation',
-  },
-  {
-    id: 'saucony',
-    name: 'Saucony',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Logo_Saucony.svg/1280px-Logo_Saucony.svg.png',
-    href: '/brands/saucony',
-    description: 'Technical precision for runners',
-  },
-];
+const BrandSkeleton = () => (
+  <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-white shadow-lg">
+    <Skeleton className="h-16 w-24 mb-6" />
+    <Skeleton className="h-6 w-20 mb-2" />
+    <Skeleton className="h-4 w-32" />
+  </div>
+);
 
 const BrandsSection = () => {
+  const { data: brands, isLoading, error } = useFeaturedBrands();
   const containerRef = useRef<HTMLDivElement>(null);
   const brandRefs = useRef<(HTMLElement | null)[]>([]);
 
@@ -94,10 +67,22 @@ const BrandsSection = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-            {brands.map((brand, index) => (
+            {isLoading ? (
+              // Show loading skeletons
+              Array.from({ length: 5 }).map((_, index) => (
+                <div key={`skeleton-${index}`}>
+                  <BrandSkeleton />
+                </div>
+              ))
+            ) : error ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">Unable to load brands</p>
+              </div>
+            ) : (
+              brands?.map((brand, index) => (
                 <Link
                     key={brand.id}
-                    to={brand.href}
+                    to={`/brands/${brand.slug}`}
                     className={cn(
                         "flex flex-col items-center justify-center p-8 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-500",
                         "group hover:translate-y-[-8px] motion-safe-animate bg-white/80",
@@ -112,7 +97,7 @@ const BrandsSection = () => {
                   <div className="relative z-10">
                     <div className="h-16 w-full flex items-center justify-center mb-6 transition-transform duration-500 group-hover:scale-110">
                       <img
-                          src={brand.logo}
+                          src={brand.logo_url || ''}
                           alt={brand.name}
                           className="max-h-full max-w-full object-contain"
                       />
@@ -122,7 +107,7 @@ const BrandsSection = () => {
                     {brand.name}
                   </span>
                       <span className="text-sm text-gray-600 block opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-2">
-                    {brand.description}
+                    {brand.description || 'Premium running footwear'}
                   </span>
                     </div>
                   </div>
@@ -130,7 +115,8 @@ const BrandsSection = () => {
                   {/* Animated border on hover */}
                   <div className="absolute inset-0 border border-transparent group-hover:border-black/10 rounded-xl transition-colors duration-300"></div>
                 </Link>
-            ))}
+              ))
+            )}
           </div>
 
           <div className="mt-16 text-center motion-safe-animate fade-in">

@@ -3,9 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { getBrands, getProductsByBrand, products } from '@/lib/data';
+import { useBrandsWithProductCount } from '@/hooks/useBrands';
+import { useProducts } from '@/hooks/useProducts';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import ProductCard from '@/components/ProductCard';
@@ -60,6 +62,16 @@ const brandAssets: Record<string, { logo: string, background: string, accent: st
   }
 };
 
+const BrandSkeleton = () => (
+  <Card className="overflow-hidden">
+    <Skeleton className="aspect-[16/9] w-full" />
+    <CardContent className="p-6">
+      <Skeleton className="h-6 w-32 mb-2" />
+      <Skeleton className="h-4 w-20" />
+    </CardContent>
+  </Card>
+);
+
 interface BrandInfo {
   name: string;
   logo: string;
@@ -69,12 +81,13 @@ interface BrandInfo {
 }
 
 const BrandsPage = () => {
-  const brandNames = getBrands();
+  const { data: brandsData, isLoading: brandsLoading, error: brandsError } = useBrandsWithProductCount();
+  const { data: allProductsData, isLoading: productsLoading } = useProducts();
+  
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [displayedProducts, setDisplayedProducts] = useState(products);
+  const [displayedProducts, setDisplayedProducts] = useState(allProductsData?.data || []);
   const [brandsInfo, setBrandsInfo] = useState<BrandInfo[]>([]);
   const [activeView, setActiveView] = useState<'grid' | 'list'>('grid');
-  const [isLoading, setIsLoading] = useState(true);
 
   const brandSectionRef = useRef<HTMLDivElement>(null);
   const brandRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -113,19 +126,18 @@ const BrandsPage = () => {
 
   // Prepare brands info with product counts
   useEffect(() => {
-    setIsLoading(true);
+    if (!brandsData) return;
 
-    const brands = brandNames.map(name => {
-      const brandProducts = getProductsByBrand(name);
-      const defaultLogo = "https://placehold.co/200x80?text=" + name;
+    const brands = brandsData.map(brand => {
+      const defaultLogo = "https://placehold.co/200x80?text=" + brand.name;
       const defaultBackground = "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80";
 
       return {
-        name,
-        logo: brandAssets[name]?.logo || defaultLogo,
-        background: brandAssets[name]?.background || defaultBackground,
-        accent: brandAssets[name]?.accent || "from-gray-600 to-slate-800",
-        productCount: brandProducts.length
+        name: brand.name,
+        logo: brand.logo_url || brandAssets[brand.name]?.logo || defaultLogo,
+        background: brandAssets[brand.name]?.background || defaultBackground,
+        accent: brandAssets[brand.name]?.accent || "from-gray-600 to-slate-800",
+        productCount: brand.product_count
       };
     });
 
@@ -133,17 +145,22 @@ const BrandsPage = () => {
     const sortedBrands = brands.sort((a, b) => b.productCount - a.productCount);
 
     setBrandsInfo(sortedBrands);
-    setIsLoading(false);
-  }, [brandNames]);
+  }, [brandsData]);
 
   // Update displayed products when brand selection changes
   useEffect(() => {
+    if (!allProductsData?.data) return;
+    
     if (selectedBrand) {
-      setDisplayedProducts(getProductsByBrand(selectedBrand));
+      setDisplayedProducts(
+        allProductsData.data.filter(product => 
+          product.brand.name.toLowerCase() === selectedBrand.toLowerCase()
+        )
+      );
     } else {
-      setDisplayedProducts(products);
+      setDisplayedProducts(allProductsData.data);
     }
-  }, [selectedBrand, products]);
+  }, [selectedBrand, allProductsData]);
 
   const handleBrandSelect = (brandName: string) => {
     setSelectedBrand(prev => prev === brandName ? null : brandName);
@@ -180,7 +197,16 @@ const BrandsPage = () => {
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {brandsInfo.map((brand, index) => (
+              {brandsLoading ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <BrandSkeleton key={`skeleton-${index}`} />
+                ))
+              ) : brandsError ? (
+                <div className="col-span-full text-center py-8">
+                  <p className="text-gray-500">Unable to load brands</p>
+                </div>
+              ) : (
+                brandsInfo.map((brand, index) => (
                   <div
                       key={brand.name}
                       ref={(el) => (brandRefs.current[index] = el)}
@@ -219,7 +245,8 @@ const BrandsPage = () => {
                       </Card>
                     </Link>
                   </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </section>
@@ -259,13 +286,13 @@ const BrandsPage = () => {
                 <TabsTrigger value="all" onClick={() => setSelectedBrand(null)}>
                   All Brands
                 </TabsTrigger>
-                {brandNames.map(brand => (
+                {brandsInfo.map(brand => (
                     <TabsTrigger
-                        key={brand}
-                        value={brand}
-                        onClick={() => setSelectedBrand(brand)}
+                        key={brand.name}
+                        value={brand.name}
+                        onClick={() => setSelectedBrand(brand.name)}
                     >
-                      {brand}
+                      {brand.name}
                     </TabsTrigger>
                 ))}
               </TabsList>
@@ -283,45 +310,73 @@ const BrandsPage = () => {
                       <Filter className="h-4 w-4" />
                     </Button>
                     <span className="text-sm text-black/70">
-                    {displayedProducts.length} products
+                    {productsLoading ? 'Loading...' : `${displayedProducts.length} products`}
                   </span>
                   </div>
                 </div>
 
                 {activeView === 'grid' ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
-                      {displayedProducts.map((product) => (
-                          <ProductCard
-                              key={product.id}
-                              id={product.id}
-                              name={product.name}
-                              brand={product.brand}
-                              price={product.price}
-                              originalPrice={product.originalPrice}
-                              colorway={product.colorway}
-                              image={product.image}
-                              isNew={product.isNew}
-                              isSale={product.isSale}
-                          />
-                      ))}
+                      {productsLoading ? (
+                        Array.from({ length: 12 }).map((_, index) => (
+                          <div key={`skeleton-${index}`} className="space-y-4">
+                            <Skeleton className="aspect-square w-full rounded-lg" />
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-3/4" />
+                              <Skeleton className="h-4 w-1/2" />
+                              <Skeleton className="h-4 w-1/4" />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        displayedProducts.map((product) => (
+                            <ProductCard
+                                key={product.id}
+                                id={product.id}
+                                name={product.name}
+                                brand={product.brand.name}
+                                price={product.min_price}
+                                originalPrice={product.compare_at_price || undefined}
+                                colorway={product.variants?.[0]?.colorway || 'Multiple Colors'}
+                                image={product.primary_image || ''}
+                                isNew={product.is_new}
+                                isSale={!!product.compare_at_price}
+                            />
+                        ))
+                      )}
                     </div>
                 ) : (
                     <div className="flex flex-col gap-6">
-                      {displayedProducts.map((product) => (
+                      {productsLoading ? (
+                        Array.from({ length: 6 }).map((_, index) => (
+                          <Card key={`skeleton-${index}`} className="overflow-hidden">
+                            <div className="flex flex-col sm:flex-row">
+                              <Skeleton className="sm:w-1/3 aspect-square sm:aspect-auto h-48" />
+                              <div className="p-6 sm:w-2/3 space-y-4">
+                                <Skeleton className="h-6 w-48" />
+                                <Skeleton className="h-4 w-32" />
+                                <Skeleton className="h-16 w-full" />
+                                <Skeleton className="h-10 w-24" />
+                              </div>
+                            </div>
+                          </Card>
+                        ))
+                      ) : (
+                        displayedProducts.map((product) => (
                           <Card key={product.id} className="overflow-hidden">
                             <div className="flex flex-col sm:flex-row">
                               <div className="sm:w-1/3 aspect-square sm:aspect-auto relative">
                                 <img
-                                    src={product.image}
-                                    alt={`${product.brand} ${product.name}`}
+                                    src={product.primary_image || ''}
+                                    alt={`${product.brand.name} ${product.name}`}
                                     className="h-full w-full object-cover object-center"
                                 />
-                                {product.isNew && (
+                                {product.is_new && (
                                     <div className="absolute top-2 left-2 bg-black text-white text-xs font-medium px-2 py-1 rounded">
                                       New
                                     </div>
                                 )}
-                                {product.isSale && (
+                                {product.compare_at_price && (
                                     <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-medium px-2 py-1 rounded">
                                       Sale
                                     </div>
@@ -331,24 +386,24 @@ const BrandsPage = () => {
                                 <div>
                                   <div className="flex justify-between items-start">
                                     <div>
-                                      <p className="text-sm font-medium text-black/80">{product.brand}</p>
+                                      <p className="text-sm font-medium text-black/80">{product.brand.name}</p>
                                       <h3 className="text-lg font-bold mt-1">{product.name}</h3>
-                                      <p className="mt-1 text-sm text-black/60">{product.colorway}</p>
+                                      <p className="mt-1 text-sm text-black/60">{product.variants?.[0]?.colorway || 'Multiple Colors'}</p>
                                     </div>
                                     <div className="flex items-center">
-                                      <p className="font-medium">${product.price.toFixed(2)}</p>
-                                      {product.originalPrice && (
-                                          <p className="ml-2 text-sm text-black/60 line-through">${product.originalPrice.toFixed(2)}</p>
+                                      <p className="font-medium">${product.min_price.toFixed(2)}</p>
+                                      {product.compare_at_price && (
+                                          <p className="ml-2 text-sm text-black/60 line-through">${product.compare_at_price.toFixed(2)}</p>
                                       )}
                                     </div>
                                   </div>
-                                  <p className="mt-4 text-sm text-black/70">{product.description || "Premium running shoes designed for performance and comfort."}</p>
+                                  <p className="mt-4 text-sm text-black/70">{product.short_description || "Premium running shoes designed for performance and comfort."}</p>
                                 </div>
                                 <div className="mt-6 flex justify-between items-center">
                                   <div className="flex gap-2">
-                                    {product.tags?.map(tag => (
-                                        <span key={tag} className="inline-block bg-gray-100 text-black/70 text-xs px-2 py-1 rounded">
-                                  {tag}
+                                    {product.tags?.slice(0, 3).map(tagObj => (
+                                        <span key={tagObj.tag} className="inline-block bg-gray-100 text-black/70 text-xs px-2 py-1 rounded">
+                                  {tagObj.tag}
                                 </span>
                                     ))}
                                   </div>
@@ -359,7 +414,8 @@ const BrandsPage = () => {
                               </div>
                             </div>
                           </Card>
-                      ))}
+                        ))
+                      )}
                     </div>
                 )}
 
@@ -370,11 +426,11 @@ const BrandsPage = () => {
                 )}
               </TabsContent>
 
-              {brandNames.map(brand => (
+              {brandsInfo.map(brand => (
                   <TabsContent key={brand} value={brand} className="mt-0">
                     {/* Same content as "all" but filtered for this brand */}
                     <div className="mb-6 flex justify-between items-center">
-                      <h3 className="text-xl font-semibold">{brand} Products</h3>
+                      <h3 className="text-xl font-semibold">{brand.name} Products</h3>
                       <span className="text-sm text-black/70">
                     {displayedProducts.length} products
                   </span>
@@ -386,13 +442,13 @@ const BrandsPage = () => {
                               key={product.id}
                               id={product.id}
                               name={product.name}
-                              brand={product.brand}
-                              price={product.price}
-                              originalPrice={product.originalPrice}
-                              colorway={product.colorway}
-                              image={product.image}
-                              isNew={product.isNew}
-                              isSale={product.isSale}
+                              brand={product.brand.name}
+                              price={product.min_price}
+                              originalPrice={product.compare_at_price || undefined}
+                              colorway={product.variants?.[0]?.colorway || 'Multiple Colors'}
+                              image={product.primary_image || ''}
+                              isNew={product.is_new}
+                              isSale={!!product.compare_at_price}
                           />
                       ))}
                     </div>

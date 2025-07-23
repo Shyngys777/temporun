@@ -1,3 +1,5 @@
+// Legacy data file - keeping for backward compatibility during migration
+// TODO: Remove this file once all components are migrated to Supabase
 
 export interface Product {
   id: string;
@@ -15,6 +17,9 @@ export interface Product {
   description?: string;
   tags?: string[];
 }
+
+// Keep existing products array for components that haven't been migrated yet
+// This will be gradually removed as we migrate each component
 
 export const products: Product[] = [
   {

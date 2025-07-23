@@ -12,30 +12,10 @@ import {
 } from "@/components/ui/command";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSearchProducts } from "@/hooks/useProducts";
+import { useBrands } from "@/hooks/useBrands";
+import { useCategories } from "@/hooks/useCategories";
 
-// Sample search data - this would typically come from your API/database
-const searchData = {
-    products: [
-        { id: "1", name: "Ultraboost Light", brand: "Adidas", category: "road-running", href: "/product/1" },
-        { id: "2", name: "Pegasus 40", brand: "Nike", category: "road-running", href: "/product/2" },
-        { id: "3", name: "Fresh Foam X 1080v12", brand: "New Balance", category: "road-running", href: "/product/3" },
-        { id: "4", name: "Gel-Kayano 29", brand: "Asics", category: "road-running", href: "/product/4" },
-        { id: "5", name: "Ultra Trail", brand: "Nike", category: "trail-running", href: "/product/5" },
-        { id: "6", name: "Speedcross 6", brand: "Salomon", category: "trail-running", href: "/product/6" },
-    ],
-    brands: [
-        { id: "nike", name: "Nike", href: "/brands/nike" },
-        { id: "adidas", name: "Adidas", href: "/brands/adidas" },
-        { id: "newbalance", name: "New Balance", href: "/brands/new-balance" },
-        { id: "asics", name: "Asics", href: "/brands/asics" },
-        { id: "saucony", name: "Saucony", href: "/brands/saucony" },
-    ],
-    categories: [
-        { id: "road-running", name: "Road Running", href: "/categories/road-running" },
-        { id: "trail-running", name: "Trail Running", href: "/categories/trail-running" },
-        { id: "competition", name: "Competition", href: "/categories/competition" },
-    ],
-};
 
 export function SearchButton() {
     const [open, setOpen] = React.useState(false);
@@ -76,6 +56,10 @@ interface SearchDialogProps {
 export function SearchDialog({ open, setOpen }: SearchDialogProps) {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = React.useState("");
+    
+    const { data: searchResults } = useSearchProducts(searchQuery);
+    const { data: brands } = useBrands();
+    const { data: categories } = useCategories();
 
     const handleSelect = (href: string) => {
         setOpen(false);
@@ -83,23 +67,16 @@ export function SearchDialog({ open, setOpen }: SearchDialogProps) {
         setSearchQuery("");
     };
 
-    const filteredProducts = searchQuery
-        ? searchData.products.filter(
-            (product) =>
-                product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product.category.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        : [];
+    const filteredProducts = searchResults || [];
 
     const filteredBrands = searchQuery
-        ? searchData.brands.filter((brand) =>
+        ? (brands || []).filter((brand) =>
             brand.name.toLowerCase().includes(searchQuery.toLowerCase())
         )
         : [];
 
     const filteredCategories = searchQuery
-        ? searchData.categories.filter((category) =>
+        ? (categories || []).filter((category) =>
             category.name.toLowerCase().includes(searchQuery.toLowerCase())
         )
         : [];
@@ -133,13 +110,13 @@ export function SearchDialog({ open, setOpen }: SearchDialogProps) {
                         {filteredProducts.map((product) => (
                             <CommandItem
                                 key={product.id}
-                                onSelect={() => handleSelect(product.href)}
+                                onSelect={() => handleSelect(`/product/${product.slug}`)}
                                 className="flex items-center py-2 cursor-pointer"
                             >
                                 <div className="flex flex-col">
                                     <span className="font-medium">{product.name}</span>
                                     <span className="text-sm text-muted-foreground">
-                    {product.brand} • {product.category.replace("-", " ")}
+                    {product.brand.name} • {product.category?.name || 'Running'}
                   </span>
                                 </div>
                             </CommandItem>
@@ -152,7 +129,7 @@ export function SearchDialog({ open, setOpen }: SearchDialogProps) {
                         {filteredBrands.map((brand) => (
                             <CommandItem
                                 key={brand.id}
-                                onSelect={() => handleSelect(brand.href)}
+                                onSelect={() => handleSelect(`/brands/${brand.slug}`)}
                                 className="cursor-pointer"
                             >
                                 {brand.name}
@@ -166,7 +143,7 @@ export function SearchDialog({ open, setOpen }: SearchDialogProps) {
                         {filteredCategories.map((category) => (
                             <CommandItem
                                 key={category.id}
-                                onSelect={() => handleSelect(category.href)}
+                                onSelect={() => handleSelect(`/categories/${category.slug}`)}
                                 className="cursor-pointer"
                             >
                                 {category.name}
